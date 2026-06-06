@@ -1,36 +1,188 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DAVAJ-BACHA
 
-## Getting Started
+> Diagnostická a vzdelávacia platforma pre digitálnu odolnosť žiakov.
 
-First, run the development server:
+**DAVAJ-BACHA** je webová platforma, ktorá žiakov naučí bezpečne reagovať na online hrozby — grooming, phishing, deepfake manipuláciu a kyberšikanu — skôr, než príde skutočný incident. Vyvinutá v rámci **Ideathon 2026 — GPM Park mládeže Košice**.
+
+---
+
+## 🎯 Čo platforma ponúka
+
+| Modul | Popis |
+|-------|-------|
+| **Simulátor scenárov** | 10 realistických situácií s okamžitou spätnou väzbou |
+| **Digitálna stopa** | Interaktívny profilový test — čo sa dá odvodiť z verejných príspevkov |
+| **Školský dashboard** | Agregované triedné štatistiky, 100% anonymné |
+| **QR vstup** | Žiaci sa pripoja bez loginu — len cez vstupný kód od učiteľa |
+
+---
+
+## 🛠 Tech stack
+
+- **Framework:** [Next.js](https://nextjs.org) 16 (App Router)
+- **Frontend:** React 19, TypeScript, Tailwind CSS v4, shadcn/ui
+- **Efekty:** Three.js (liquid-ether hero), Motion
+- **ORM:** [Drizzle ORM](https://orm.drizzle.team) + PostgreSQL
+- **AI:** [OpenRouter](https://openrouter.ai) (generovanie balíkov, verifikácia digitálnej stopy)
+- **Auth:** Session cookie + bcrypt (dashboard pre učiteľov)
+
+---
+
+## 🚀 Lokálny setup
+
+### 1. Klonuj repozitár
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/gpmbigthinkers/davajbacha.git
+cd davajbacha
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Inštaluj závislosti
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Projekt používa `pnpm`. Ak ho nemáš nainštalovaný:
+> ```bash
+> npm install -g pnpm
+> ```
 
-## Learn More
+### 3. Nastav prostredie
 
-To learn more about Next.js, take a look at the following resources:
+Skopíruj `.env.example` do `.env.local`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+cp .env.example .env.local
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Uprav premenné:
 
-## Deploy on Vercel
+| Premenná | Popis |
+|----------|-------|
+| `DATABASE_URL` | PostgreSQL connection string (odporúčame [Supabase](https://supabase.com)) |
+| `DATABASE_SSL` | `false` pre lokálny vývoj, `require` pre Supabase |
+| `AUTH_SECRET` | Náhodný 64-znakový hex reťazec pre session cookies |
+| `ADMIN_PASSWORD` | Heslo pre prvý admin účet (vytvorený seedom) |
+| `OPENROUTER_API_KEY` | API kľúč pre AI funkcie (voliteľné, bez neho AI featury nejdú) |
+| `OPENROUTER_MODEL` | Model na OpenRouteri (default: `google/gemini-2.0-flash-001`) |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Vygeneruj AUTH_SECRET:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 4. Vytvor databázu
+
+```bash
+# Vygeneruj migrácie (ak ešte neexistujú)
+pnpm db:generate
+
+# Spusť migrácie — vytvorí tabuľky
+pnpm db:migrate
+
+# Napln databázu demo dátami (škola, trieda, scenáre, admin)
+pnpm db:seed
+```
+
+Seed vytvorí:
+- školu: *GPM Park mladeze Kosice*
+- triedu: *2.B*
+- admina: `admin@gpm.sk` s heslom z `ADMIN_PASSWORD`
+- 10 scenárových templátov
+
+### 5. Spusť dev server
+
+```bash
+pnpm dev
+```
+
+Otvor [http://localhost:3000](http://localhost:3000).
+
+### 6. Ďalšie príkazy
+
+```bash
+pnpm build      # Production build
+pnpm start      # Production server
+pnpm lint       # ESLint
+pnpm typecheck  # TypeScript check
+pnpm test       # Vitest unit testy
+```
+
+---
+
+## 📁 Štruktúra projektu
+
+```
+src/
+├── app/              # Next.js App Router
+│   ├── api/          # REST API route handlers
+│   ├── dashboard/    # Školský dashboard (auth required)
+│   ├── scenar/       # Simulátor scenárov
+│   ├── digitalna-stopa/   # Digitálna stopa
+│   ├── vstup/        # QR/vstupný kód pre žiakov
+│   ├── login/        # Prihlásenie pre učiteľov
+│   └── page.tsx      # Landing page
+├── components/
+│   ├── platform/     # Hlavné platformové komponenty
+│   ├── reactbits/    # Hero efekty (liquid-ether)
+│   └── ui/           # shadcn/ui komponenty
+├── db/
+│   ├── schema.ts     # Drizzle schéma
+│   ├── client.ts     # DB klient
+│   └── seed.ts       # Demo dáta
+├── lib/
+│   ├── auth.ts       # Auth helpers (bcrypt, session)
+│   ├── platform-data.ts      # Scenárové dáta
+│   ├── platform-repository.ts # DB queries
+│   ├── scoring.ts    # Bodovanie odpovedí
+│   └── openrouter.ts # AI klient
+└── scripts/          # Pomocné skripty
+```
+
+---
+
+## 🧪 Testy
+
+```bash
+# Spusť všetky testy
+pnpm test
+
+# Watch mode
+pnpm vitest
+```
+
+Unit testy pokrývajú:
+- bodovanie scenárov (`scoring.test.ts`)
+- verifikáciu digitálnej stopy (`footprint-verification.test.ts`)
+- AI API endpointy (`verify-footprint/route.test.ts`)
+
+---
+
+## 🎨 UI konvencie
+
+- **Farby:** Primárna `#4c1d95` (fialová), akcent `#ec4899` (ružová)
+- **Fonty:** Cormorant Garamond (nadpisy), Plus Jakarta Sans (text)
+- **Komponenty:** shadcn/ui s vlastnými overridmi
+- **Animácie:** Framer Motion pre prechody, Three.js canvas pre hero sekciu
+
+---
+
+## 🏗 Deploy
+
+Odporúčaná cesta:
+
+1. **Vercel** pre frontend
+2. **Supabase** pre PostgreSQL
+3. Pridaj environment premenné vo Vercel dashboarde
+4. Spusť `drizzle-kit migrate` cez CLI alebo CI/CD
+
+---
+
+## 📝 Licencia
+
+© 2026 DAVAJ-BACHA — vyvinuté v rámci Ideathon 2026, GPM Park mládeže Košice.
+
+---
+
+**Dávaš bacha?** Žiaci áno. 🧠🔒
