@@ -300,10 +300,10 @@ export default function Home() {
               <ul className="mt-4 space-y-3 text-white/75">
                 <li>
                   <a
-                    href="mailto:team@davajbacha.sk"
+                    href="mailto:team@bigthinkers.sk"
                     className="transition hover:text-white"
                   >
-                    team@davajbacha.sk
+                    BigThinkers Team
                   </a>
                 </li>
                 <li className="text-sm text-white/40">
