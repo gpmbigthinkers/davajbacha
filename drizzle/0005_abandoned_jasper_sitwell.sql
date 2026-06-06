@@ -1,0 +1,1 @@
+ALTER TABLE "scenario_steps" ADD COLUMN "messages" jsonb;

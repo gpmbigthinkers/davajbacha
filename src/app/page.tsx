@@ -8,6 +8,8 @@ import {
   MessageSquareWarning,
 } from "lucide-react";
 
+import { getHomepageStats } from "@/lib/platform-repository";
+
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -20,7 +22,7 @@ import {
 import { HeroScene } from "@/components/reactbits/hero-scene";
 import { MagicBento } from "@/components/reactbits/magic-bento";
 import { ShinyText } from "@/components/reactbits/shiny-text";
-import { MetricStrip } from "@/components/demo/metric-strip";
+import { MetricStrip } from "@/components/platform/metric-strip";
 import { cn } from "@/lib/utils";
 
 const bentoItems = [
@@ -53,7 +55,9 @@ const bentoItems = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const stats = await getHomepageStats();
+
   return (
     <main>
       {/* Hero */}
@@ -67,13 +71,13 @@ export default function Home() {
             DAVAJ-BACHA
           </Link>
           <Link
-            href="/demo?presentation=1"
+            href="/platform?presentation=1"
             className={cn(
               buttonVariants({ variant: "secondary", size: "lg" }),
               "h-10 bg-white/92 text-primary hover:bg-white"
             )}
           >
-            Otvoriť demo
+            Otvoriť platformu
             <ArrowRight data-icon="inline-end" />
           </Link>
         </header>
@@ -92,7 +96,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/demo/scenar?presentation=1"
+                href="/scenar?presentation=1"
                 className={cn(
                   buttonVariants({ size: "lg" }),
                   "h-11 bg-[#EC4899] hover:bg-[#DB2777]"
@@ -102,7 +106,7 @@ export default function Home() {
                 <MessageSquareWarning data-icon="inline-end" />
               </Link>
               <Link
-                href="/demo/dashboard?presentation=1"
+                href="/dashboard"
                 className={cn(
                   buttonVariants({ variant: "outline", size: "lg" }),
                   "h-11 border-white/45 bg-white/10 text-white hover:bg-white hover:text-primary"
@@ -120,6 +124,11 @@ export default function Home() {
       <section className="relative z-20 mx-auto max-w-7xl px-5 pt-16 pb-8">
         <MetricStrip />
       </section>
+
+      {/* Divider */}
+      <div className="mx-auto max-w-7xl px-5">
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      </div>
 
       {/* Problem + Bento */}
       <section className="mx-auto mt-20 max-w-7xl px-5 py-16">
@@ -190,17 +199,17 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-5">
           <div className="grid gap-8 md:grid-cols-3">
             <ImpactItem
-              value="25%"
+              value={`${stats.reduction}%`}
               label="Redukcia chybovosti"
               description="Cieľová hodnota pilotného overenia v opakovaných scenároch."
             />
             <ImpactItem
-              value="126"
+              value={`${stats.sessions}`}
               label="Anonymných session"
               description="Vzorka pilotného testovania bez individuálnych záznamov."
             />
             <ImpactItem
-              value="91%"
+              value={`${stats.completion}%`}
               label="Dokončenie scenárov"
               description="Triedny priemer dokončených aktivít počas jednej hodiny."
             />
@@ -223,13 +232,13 @@ export default function Home() {
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
-                  href="/demo?presentation=1"
+                  href="/scenar?presentation=1"
                   className={cn(
                     buttonVariants({ variant: "secondary", size: "sm" }),
                     "bg-white text-primary hover:bg-white/90"
                   )}
                 >
-                  Otvoriť demo
+                  Otvoriť platformu
                 </Link>
                 <a
                   href="https://github.com/your-org/davajbacha"
@@ -266,7 +275,7 @@ export default function Home() {
               <ul className="mt-4 space-y-3 text-white/75">
                 <li>
                   <Link
-                    href="/demo/scenar?presentation=1"
+                    href="/scenar?presentation=1"
                     className="inline-flex items-center gap-2 transition hover:text-white"
                   >
                     Simulátor scenárov
@@ -275,7 +284,7 @@ export default function Home() {
                 </li>
                 <li>
                   <Link
-                    href="/demo/digitalna-stopa?presentation=1"
+                    href="/digitalna-stopa?presentation=1"
                     className="inline-flex items-center gap-2 transition hover:text-white"
                   >
                     Digitálna stopa
@@ -284,7 +293,7 @@ export default function Home() {
                 </li>
                 <li>
                   <Link
-                    href="/demo/dashboard?presentation=1"
+                    href="/dashboard"
                     className="inline-flex items-center gap-2 transition hover:text-white"
                   >
                     Školský dashboard

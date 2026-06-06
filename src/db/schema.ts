@@ -11,7 +11,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import type { ScenarioOption, ThreatCategory } from "../lib/demo-types";
+import type { ChatMessage, ScenarioOption, ThreatCategory } from "../lib/platform-types";
 
 export const schools = pgTable(
   "schools",
@@ -56,6 +56,7 @@ export const scenarioTemplates = pgTable("scenario_templates", {
     .$type<ThreatCategory>()
     .notNull(),
   summary: text("summary").notNull(),
+  accent: varchar("accent", { length: 20 }).default("#EC4899").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -67,10 +68,12 @@ export const scenarioSteps = pgTable(
       .notNull()
       .references(() => scenarioTemplates.id, { onDelete: "cascade" }),
     stepKey: varchar("step_key", { length: 96 }).notNull(),
+    title: varchar("title", { length: 160 }).notNull(),
     order: integer("order").notNull(),
     situation: text("situation").notNull(),
     question: text("question").notNull(),
     options: jsonb("options").$type<ScenarioOption[]>().notNull(),
+    messages: jsonb("messages").$type<ChatMessage[]>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -108,6 +111,70 @@ export const scenarioResponses = pgTable("scenario_responses", {
   riskDelta: integer("risk_delta").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 255 }).notNull().unique(),
+    name: varchar("name", { length: 160 }).notNull(),
+    passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+    role: varchar("role", { length: 40 }).default("teacher").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("users_email_idx").on(table.email)]
+);
+
+export const scenarioBundles = pgTable(
+  "scenario_bundles",
+  {
+    id: serial("id").primaryKey(),
+    classId: integer("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("bundles_name_idx").on(table.classId, table.name)]
+);
+
+export const bundleScenarios = pgTable(
+  "bundle_scenarios",
+  {
+    id: serial("id").primaryKey(),
+    bundleId: integer("bundle_id")
+      .notNull()
+      .references(() => scenarioBundles.id, { onDelete: "cascade" }),
+    scenarioId: integer("scenario_id")
+      .notNull()
+      .references(() => scenarioTemplates.id, { onDelete: "cascade" }),
+    order: integer("order").default(0).notNull(),
+  },
+  (table) => [
+    uniqueIndex("bundle_scenarios_bundle_scenario_idx").on(
+      table.bundleId,
+      table.scenarioId
+    ),
+  ]
+);
+
+export const entryCodes = pgTable(
+  "entry_codes",
+  {
+    id: serial("id").primaryKey(),
+    classId: integer("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    bundleId: integer("bundle_id").references(() => scenarioBundles.id, { onDelete: "set null" }),
+    code: varchar("code", { length: 8 }).notNull().unique(),
+    qrToken: uuid("qr_token").defaultRandom().notNull().unique(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("entry_codes_code_idx").on(table.code)]
+);
 
 export const footprintProfiles = pgTable("footprint_profiles", {
   id: uuid("id").defaultRandom().primaryKey(),

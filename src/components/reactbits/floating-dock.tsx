@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { BarChart3, Fingerprint, Home, MessageSquareWarning } from "lucide-react";
+import { Fingerprint, MessageSquareWarning } from "lucide-react";
 
 import {
   Tooltip,
@@ -12,10 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/demo", label: "Demo hub", icon: Home },
-  { href: "/demo/scenar", label: "Simulátor", icon: MessageSquareWarning },
-  { href: "/demo/digitalna-stopa", label: "Digitálna stopa", icon: Fingerprint },
-  { href: "/demo/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/scenar", label: "Simulátor", icon: MessageSquareWarning },
+  { href: "/digitalna-stopa", label: "Digitálna stopa", icon: Fingerprint },
 ];
 
 export function FloatingDock() {

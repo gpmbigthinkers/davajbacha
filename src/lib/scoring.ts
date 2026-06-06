@@ -1,24 +1,29 @@
-import { footprintSignals, presentationDashboard, scenarioTemplates, threatLabels } from "@/lib/demo-data";
+import {
+  presentationDashboard,
+  scenarioTemplates,
+  threatLabels,
+} from "@/lib/platform-data";
 import type {
+  BachavostBucket,
   DashboardOverview,
-  FootprintInput,
-  FootprintRiskSummary,
   ScenarioFeedback,
   ThreatCategory,
-} from "@/lib/demo-types";
+} from "@/lib/platform-types";
+
+export const MAX_BACHAVOST = 5;
 
 export function getScenarioFeedback(
   scenarioSlug: string,
   stepKey: string,
   selectedOptionId: string,
   attemptId?: string
-): ScenarioFeedback {
+): ScenarioFeedback | null {
   const scenario = scenarioTemplates.find((item) => item.slug === scenarioSlug);
   const step = scenario?.steps.find((item) => item.key === stepKey);
   const option = step?.options.find((item) => item.id === selectedOptionId);
 
   if (!scenario || !step || !option) {
-    throw new Error("Unknown scenario answer");
+    return null;
   }
 
   return {
@@ -30,22 +35,41 @@ export function getScenarioFeedback(
   };
 }
 
-export function calculateFootprintRisk(input: FootprintInput): FootprintRiskSummary {
-  const selected = footprintSignals.filter((signal) =>
-    input.selectedSignals.includes(signal.id)
-  );
-  const riskScore = Math.min(
-    100,
-    selected.reduce((total, signal) => total + signal.risk, 0)
+export function calculateBachavost(totalAnswers: number, safeAnswers: number) {
+  if (totalAnswers <= 0) {
+    return 0;
+  }
+
+  const normalized = (safeAnswers / totalAnswers) * MAX_BACHAVOST;
+  return Math.max(0, Math.min(MAX_BACHAVOST, Math.round(normalized)));
+}
+
+export function buildBachavostDistribution(scores: number[]): {
+  averageBachavost: number;
+  scoreDistribution: BachavostBucket[];
+} {
+  const total = scores.length;
+  const buckets = Array.from({ length: MAX_BACHAVOST + 1 }, (_, score) => {
+    const count = scores.filter((item) => item === score).length;
+    return {
+      score,
+      label: `${score}`,
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+    };
+  });
+
+  const weightedTotal = buckets.reduce(
+    (sum, bucket) => sum + bucket.score * bucket.count,
+    0
   );
 
   return {
-    riskScore,
-    level: riskScore >= 60 ? "vysoke" : riskScore >= 30 ? "stredne" : "nizke",
-    derivedRisks: selected.map((signal) => signal.derived),
-    safeProfile: footprintSignals
-      .filter((signal) => input.selectedSignals.includes(signal.id))
-      .map((signal) => signal.safe),
+    averageBachavost:
+      total > 0
+        ? Math.round((weightedTotal / total) * 10) / 10
+        : 0,
+    scoreDistribution: buckets,
   };
 }
 
@@ -66,7 +90,7 @@ export function summarizeDashboardFromResponses(
       category: category as ThreatCategory,
       label,
       errorRate,
-      improvement: Math.max(12, 42 - errorRate),
+      improvement: 0,
       responses: scoped.length,
     };
   });
@@ -80,6 +104,7 @@ export function summarizeDashboardFromResponses(
     updatedAt: new Date().toISOString(),
     sampleSize: Math.max(sessionCount, presentationDashboard.sampleSize),
     completionRate: Math.min(96, Math.max(72, Math.round(100 - averageUnsafe / 2))),
+    averageBachavost: presentationDashboard.averageBachavost,
     categories,
     riskAreas: categories
       .toSorted((a, b) => b.errorRate - a.errorRate)
