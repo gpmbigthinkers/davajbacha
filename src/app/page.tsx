@@ -71,7 +71,7 @@ export default async function Home() {
             DAVAJ-BACHA
           </Link>
           <Link
-            href="/platform?presentation=1"
+            href="/scenar"
             className={cn(
               buttonVariants({ variant: "secondary", size: "lg" }),
               "h-10 bg-white/92 text-primary hover:bg-white"
@@ -96,7 +96,7 @@ export default async function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/scenar?presentation=1"
+                href="/scenar"
                 className={cn(
                   buttonVariants({ size: "lg" }),
                   "h-11 bg-[#EC4899] hover:bg-[#DB2777]"
@@ -241,12 +241,12 @@ export default async function Home() {
                   Otvoriť platformu
                 </Link>
                 <a
-                  href="https://github.com/your-org/davajbacha"
+                  href="https://github.com/gpmbigthinkers/davajbacha"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "border-white/30 text-white hover:bg-white/10"
+                    buttonVariants({ variant: "secondary", size: "sm" }),
+                    "bg-white text-primary hover:bg-white/90"
                   )}
                 >
                   GitHub
