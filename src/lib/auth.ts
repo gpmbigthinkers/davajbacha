@@ -1,5 +1,8 @@
 import { cookies } from "next/headers";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+
+const scryptAsync = promisify(scrypt);
 
 const AUTH_SECRET = process.env.AUTH_SECRET;
 if (!AUTH_SECRET) {
@@ -8,16 +11,16 @@ if (!AUTH_SECRET) {
 // TypeScript narrows after throw at top level — cast for safety
 const SECRET: string = AUTH_SECRET;
 
-export function hashPassword(password: string): string {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
+  const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${hash.toString("hex")}`;
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return false;
-  const derived = scryptSync(password, salt, 64);
+  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
   const storedBuf = Buffer.from(hash, "hex");
   if (derived.length !== storedBuf.length) return false;
   return timingSafeEqual(derived, storedBuf);
