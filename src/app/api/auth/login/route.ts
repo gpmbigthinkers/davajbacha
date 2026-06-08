@@ -26,11 +26,11 @@ export async function POST(request: Request) {
 
     if (!user) {
       // Dummy verification to prevent timing-based email enumeration
-      await verifyPassword(body.password, "00000000000000000000000000000000:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+      verifyPassword(body.password, "00000000000000000000000000000000:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
       return Response.json({ error: "Nesprávny email alebo heslo" }, { status: 401 });
     }
 
-    if (!(await verifyPassword(body.password, user.passwordHash))) {
+    if (!verifyPassword(body.password, user.passwordHash)) {
       return Response.json({ error: "Nesprávny email alebo heslo" }, { status: 401 });
     }
 

@@ -65,7 +65,7 @@ async function main() {
     .values({
       email: "admin@davajbacha.sk",
       name: "Admin",
-      passwordHash: await hashPassword(adminPassword),
+      passwordHash: hashPassword(adminPassword),
       role: "admin",
     })
     .onConflictDoNothing();
