@@ -2,58 +2,22 @@ import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
-  CheckCircle2,
+  BadgeCheck,
   ExternalLink,
   Fingerprint,
   MessageSquareWarning,
+  QrCode,
+  ShieldCheck,
+  TrendingDown,
 } from "lucide-react";
 
 import { getHomepageStats } from "@/lib/platform-repository";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { HeroScene } from "@/components/reactbits/hero-scene";
-import { MagicBento } from "@/components/reactbits/magic-bento";
 import { ShinyText } from "@/components/reactbits/shiny-text";
-import { MetricStrip } from "@/components/platform/metric-strip";
 import { cn } from "@/lib/utils";
-
-const bentoItems = [
-  {
-    title: "Nácvik pred incidentom",
-    description:
-      "Žiaci reagujú na realistické situácie v bezpečnom prostredí a dostanú spätnú väzbu hneď po rozhodnutí.",
-    stat: "10",
-    tone: "violet" as const,
-  },
-  {
-    title: "Anonymné meranie",
-    description:
-      "Škola vidí iba triedne agregácie, nie individuálne profily ani mená.",
-    stat: "0",
-    tone: "teal" as const,
-  },
-  {
-    title: "Pilotný cieľ",
-    description:
-      "Redukcia chybovosti o minimálne 25 percent v opakovaných scenároch.",
-    stat: "25%",
-    tone: "pink" as const,
-  },
-  {
-    title: "Bez inštalácie",
-    description:
-      "Prístup cez QR kód priamo v prehliadači, bez novej infraštruktúry pre školu.",
-    tone: "coral" as const,
-  },
-];
 
 export default async function Home() {
   const stats = await getHomepageStats();
@@ -120,82 +84,159 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Metrics */}
-      <section className="relative z-20 mx-auto max-w-7xl px-5 pt-16 pb-8">
-        <MetricStrip />
+      {/* Unified Value Proposition */}
+      <section className="relative z-20 mx-auto max-w-7xl px-5 pt-16 pb-20">
+        <div className="grid gap-4 md:grid-cols-4">
+          {[
+            { label: "QR vstup", value: "bez loginu", icon: QrCode },
+            { label: "Pilot", value: "5 škôl / 8 týždňov", icon: BadgeCheck },
+            { label: "Cieľ", value: "-25% chybovosť", icon: TrendingDown },
+            { label: "Výstup", value: "anonymný dashboard", icon: ShieldCheck },
+          ].map((metric) => (
+            <div
+              key={metric.label}
+              className="group relative overflow-hidden rounded-xl border border-border/60 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md"
+            >
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-primary/20 group-hover:bg-primary/40 transition-colors" />
+              <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-primary/[0.06] text-primary">
+                <metric.icon className="size-5" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {metric.label}
+              </p>
+              <p className="mt-1 font-heading text-xl font-bold text-foreground">
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
       </section>
 
-      {/* Divider */}
-      <div className="mx-auto max-w-7xl px-5">
-        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-      </div>
-
-      {/* Problem + Bento */}
-      <section className="mx-auto mt-20 max-w-7xl px-5 py-16">
-        <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-          <div className="pt-2">
-            <Badge
-              variant="outline"
-              className="mb-6 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wider"
-            >
-              Problém
-            </Badge>
-            <h2 className="font-heading text-5xl font-bold leading-tight text-primary">
+      {/* Problem → Solution Flow */}
+      <section className="border-t border-border/60 bg-muted/30 py-24">
+        <div className="mx-auto max-w-7xl px-5">
+          {/* Header */}
+          <div className="mx-auto mb-16 max-w-3xl text-center">
+            <span className="mb-4 inline-block rounded-full bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
+              Prečo DAVAJ-BACHA
+            </span>
+            <h2 className="font-heading text-4xl font-bold leading-tight text-foreground">
               Školy zistia zlyhanie až po incidente.
             </h2>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground">
+            <p className="mt-5 text-lg leading-8 text-muted-foreground">
               Bezpečnosť online sa často vysvetľuje prednáškou, ktorá neoverí,
               či žiak vie reagovať na grooming, phishing, deepfake alebo
               kyberšikanu. DAVAJ-BACHA mení prevenciu na merateľný tréning.
             </p>
           </div>
-          <MagicBento items={bentoItems} />
+
+          {/* Feature row */}
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: MessageSquareWarning,
+                title: "Nácvik pred incidentom",
+                desc: "Žiaci reagujú na realistické situácie v bezpečnom prostredí.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Anonymné meranie",
+                desc: "Triedne agregácie bez individuálnych profilov ani mien.",
+              },
+              {
+                icon: TrendingDown,
+                title: "Merateľný cieľ",
+                desc: "Redukcia chybovosti o minimálne 25 % v opakovaných scenároch.",
+              },
+              {
+                icon: QrCode,
+                title: "Bez inštalácie",
+                desc: "Prístup cez QR kód priamo v prehliadači, žiadna infraštruktúra.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="group relative rounded-xl border border-border/60 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md"
+              >
+                <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-primary/[0.06]">
+                  <item.icon className="size-5 text-primary" />
+                </div>
+                <h3 className="font-heading text-lg font-semibold text-foreground">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Divider */}
-      <div className="mx-auto max-w-7xl px-5">
-        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-      </div>
-
       {/* Core Modules */}
-      <section className="mx-auto max-w-7xl px-5 py-20">
-        <div className="mb-12 max-w-3xl">
-          <Badge className="mb-4 bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary-foreground">
-            Core moduly
-          </Badge>
-          <h2 className="font-heading text-4xl font-bold text-primary">
-            Jedna hodina, tri výstupy.
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            QR vstup, dve žiacke aktivity a školský výstup pripravený na pilotnú
-            prezentáciu.
-          </p>
-        </div>
-        <div className="grid gap-5 md:grid-cols-3">
-          <ModuleCard
-            icon={MessageSquareWarning}
-            title="Simulátor scenárov"
-            description="Desať scenárov pokrývajúcich grooming, phishing, deepfake manipuláciu a kyberšikanu. Okamžitá spätná väzba bez moralizovania."
-            stat="10 scenárov"
-          />
-          <ModuleCard
-            icon={Fingerprint}
-            title="Digitálna stopa"
-            description="Model verejného profilu, ktorý ukáže, čo sa dá odvodiť z bežných príspevkov. Porovnanie bezpečného a rizikového profilu."
-            stat="5 signálov"
-          />
-          <ModuleCard
-            icon={BarChart3}
-            title="Školský dashboard"
-            description="Agregovaný triedný pohľad na chybovosť, posun a rizikové oblasti. Auditovateľný výstup priamo použiteľný v správach."
-            stat="100% anonymné"
-          />
+      <section className="border-t border-border/60 bg-muted/30 py-24">
+        <div className="mx-auto max-w-7xl px-5">
+          <div className="mx-auto mb-16 max-w-3xl text-center">
+            <span className="mb-4 inline-block rounded-full bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
+              Core moduly
+            </span>
+            <h2 className="font-heading text-4xl font-bold leading-tight text-foreground">
+              Jedna hodina, tri výstupy.
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-muted-foreground">
+              QR vstup, dve žiacke aktivity a školský výstup pripravený na pilotnú
+              prezentáciu.
+            </p>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            <div className="group relative rounded-xl border border-border/60 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
+              <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-primary/[0.06]">
+                <MessageSquareWarning className="size-5 text-primary" />
+              </div>
+              <h3 className="font-heading text-lg font-semibold text-foreground">
+                Simulátor scenárov
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Desať scenárov pokrývajúcich grooming, phishing, deepfake manipuláciu a kyberšikanu. Okamžitá spätná väzba bez moralizovania.
+              </p>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                10 scenárov
+              </p>
+            </div>
+            <div className="group relative rounded-xl border border-border/60 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
+              <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-primary/[0.06]">
+                <Fingerprint className="size-5 text-primary" />
+              </div>
+              <h3 className="font-heading text-lg font-semibold text-foreground">
+                Digitálna stopa
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Model verejného profilu, ktorý ukáže, čo sa dá odvodiť z bežných príspevkov. Porovnanie bezpečného a rizikového profilu.
+              </p>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                5 signálov
+              </p>
+            </div>
+            <div className="group relative rounded-xl border border-border/60 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
+              <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-primary/[0.06]">
+                <BarChart3 className="size-5 text-primary" />
+              </div>
+              <h3 className="font-heading text-lg font-semibold text-foreground">
+                Školský dashboard
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Agregovaný triedný pohľad na chybovosť, posun a rizikové oblasti. Auditovateľný výstup priamo použiteľný v správach.
+              </p>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                100% anonymné
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Impact Strip */}
-      <section className="bg-muted/50 py-16">
+      <section className="bg-muted/50 py-20">
         <div className="mx-auto max-w-7xl px-5">
           <div className="grid gap-8 md:grid-cols-3">
             <ImpactItem
@@ -324,40 +365,6 @@ export default async function Home() {
         </div>
       </section>
     </main>
-  );
-}
-
-function ModuleCard({
-  icon: Icon,
-  title,
-  description,
-  stat,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-  stat: string;
-}) {
-  return (
-    <Card className="group overflow-hidden rounded-xl border-border/60 transition-all duration-300 hover:shadow-md">
-      <CardHeader className="pb-4">
-        <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-[#EC4899]/10">
-          <Icon className="size-5 text-[#EC4899]" />
-        </div>
-        <CardTitle className="font-heading text-2xl font-bold">
-          {title}
-        </CardTitle>
-        <CardDescription className="text-sm leading-relaxed">
-          {description}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <CheckCircle2 className="size-4 text-[#0F766E]" />
-          {stat}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
