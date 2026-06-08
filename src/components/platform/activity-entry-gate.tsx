@@ -186,7 +186,7 @@ export function ActivityEntryGate({
             ) : null}
 
             <Button
-              className="h-12 w-full rounded-lg text-base"
+              className="mt-4 h-12 w-full rounded-lg text-base"
               disabled={submitting}
               onClick={() => void submitCode()}
             >
