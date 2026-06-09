@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { Navbar } from "@/components/platform/navbar";
+import Link from "next/link";
+
 import { BundleManager } from "@/components/platform/bundle-manager";
 import { DashboardView } from "@/components/platform/dashboard-view";
 import { EntryCodeGenerator } from "@/components/platform/entry-code-generator";
@@ -36,24 +37,31 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Navbar />
-      <section className="border-b border-border/60 bg-muted/30">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-            <span className="font-medium text-foreground">Dashboard</span>
-            <span aria-hidden="true">·</span>
-            <span>{context.schoolName}</span>
-            <span aria-hidden="true">·</span>
-            <span>{context.className}</span>
-            <span aria-hidden="true">·</span>
-            <span className="inline-flex items-center gap-1.5 text-foreground/80">
+      <header className="border-b border-border/60">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-2.5 text-sm">
+          <div className="flex min-w-0 items-center gap-3 text-muted-foreground">
+            <Link
+              href="/"
+              className="shrink-0 font-heading text-base font-bold tracking-tight text-foreground"
+            >
+              DAVAJ-BACHA
+            </Link>
+            <span aria-hidden="true" className="text-border">/</span>
+            <span className="truncate">
+              <span className="text-foreground">Dashboard</span>
+              <span className="mx-1.5 text-border">·</span>
+              {context.schoolName}
+              <span className="mx-1.5 text-border">·</span>
+              {context.className}
+            </span>
+            <span className="hidden items-center gap-1.5 text-foreground/70 sm:inline-flex">
               <span className="size-1.5 rounded-full bg-emerald-600" />
               Anonymizované
             </span>
           </div>
           <LogoutButton />
         </div>
-      </section>
+      </header>
 
       <section className="mx-auto max-w-7xl space-y-10 px-5 py-10">
         <header className="space-y-3">

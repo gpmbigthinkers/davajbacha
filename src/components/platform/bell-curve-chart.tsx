@@ -17,8 +17,9 @@ const VIEWBOX_HEIGHT = 240;
 const PADDING_X = 32;
 const PADDING_TOP = 16;
 const PADDING_BOTTOM = 44;
+const BASELINE_Y = PADDING_TOP + (VIEWBOX_HEIGHT - PADDING_TOP - PADDING_BOTTOM);
 
-function buildCurvePath(points: Point[]) {
+function buildLinePath(points: Point[]) {
   if (points.length === 0) {
     return "";
   }
@@ -27,20 +28,28 @@ function buildCurvePath(points: Point[]) {
     return `M ${points[0].x} ${points[0].y}`;
   }
 
+  const tension = 0.5;
   let path = `M ${points[0].x} ${points[0].y}`;
 
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const current = points[index];
-    const next = points[index + 1];
-    const midX = (current.x + next.x) / 2;
-    const midY = (current.y + next.y) / 2;
-    path += ` Q ${current.x} ${current.y} ${midX} ${midY}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const p0 = points[index - 1] ?? points[index];
+    const p1 = points[index];
+    const p2 = points[index + 1];
+    const p3 = points[index + 2] ?? p2;
+
+    const cp1x = p1.x + ((p2.x - p0.x) / 6) * tension * 2;
+    const cp1y = Math.min(
+      BASELINE_Y,
+      p1.y + ((p2.y - p0.y) / 6) * tension * 2,
+    );
+    const cp2x = p2.x - ((p3.x - p1.x) / 6) * tension * 2;
+    const cp2y = Math.min(
+      BASELINE_Y,
+      p2.y - ((p3.y - p1.y) / 6) * tension * 2,
+    );
+
+    path += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`;
   }
-
-  const penultimate = points[points.length - 2];
-  const last = points[points.length - 1];
-
-  path += ` Q ${penultimate.x} ${penultimate.y} ${last.x} ${last.y}`;
 
   return path;
 }
@@ -64,7 +73,7 @@ export function BellCurveChart({
       (bucket.count / maxCount) * innerHeight,
   }));
 
-  const linePath = buildCurvePath(points);
+  const linePath = buildLinePath(points);
 
   return (
     <div className={cn("w-full", className)}>
@@ -91,6 +100,7 @@ export function BellCurveChart({
             stroke="#4C1D95"
             strokeWidth="2"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
         ) : null}
 
