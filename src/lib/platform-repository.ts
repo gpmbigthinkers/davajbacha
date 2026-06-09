@@ -13,6 +13,7 @@ import {
   scenarioResponses,
   scenarioSteps,
   scenarioTemplates as scenarioTemplatesTable,
+  schools,
   users,
 } from "@/db/schema";
 import {
@@ -224,6 +225,41 @@ export async function recordScenarioAnswer(input: {
     riskDelta: option.riskDelta,
     feedback: option.feedback,
     principle: option.principle,
+  };
+}
+
+export type DashboardContext = {
+  schoolName: string;
+  className: string;
+};
+
+export async function getDashboardContext(): Promise<DashboardContext> {
+  const fallback: DashboardContext = {
+    schoolName: "Pilotná škola",
+    className: "Trieda 2.B",
+  };
+
+  if (!db) {
+    return fallback;
+  }
+
+  const [row] = await db
+    .select({
+      schoolName: schools.name,
+      className: classes.name,
+    })
+    .from(classes)
+    .innerJoin(schools, eq(classes.schoolId, schools.id))
+    .orderBy(classes.id)
+    .limit(1);
+
+  if (!row) {
+    return fallback;
+  }
+
+  return {
+    schoolName: row.schoolName,
+    className: row.className,
   };
 }
 

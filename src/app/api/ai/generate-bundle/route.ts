@@ -183,9 +183,9 @@ Dôležité: odpovedz IBA čistým JSON-om, bez markdown formátovania.`;
 
     return Response.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Neznáma chyba";
+    console.error("AI bundle generation failed:", err);
     return Response.json(
-      { error: `Chyba pri generovaní: ${message}` },
+      { error: "Generovanie zlyhalo. Skús to znova." },
       { status: 500 }
     );
   }
@@ -283,7 +283,7 @@ export async function PUT(request: Request) {
 
     return Response.json({ success: true, id: template.id });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Neznáma chyba";
-    return Response.json({ error: `Chyba pri ukladaní: ${message}` }, { status: 500 });
+    console.error("AI bundle save failed:", err);
+    return Response.json({ error: "Ukladanie zlyhalo. Skús to znova." }, { status: 500 });
   }
 }
