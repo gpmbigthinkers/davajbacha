@@ -128,9 +128,9 @@ Odpovedz iba čistým JSON-om podľa zadaného formátu.`;
       );
     }
 
-    const message = err instanceof Error ? err.message : "Neznáma chyba";
+    console.error("Footprint verification failed:", err);
     return Response.json(
-      { error: `Profil sa nepodarilo overiť: ${message}` },
+      { error: "Profil sa nepodarilo overiť. Skús to znova." },
       { status: 500 }
     );
   }
