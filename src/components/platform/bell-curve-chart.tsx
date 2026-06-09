@@ -14,9 +14,9 @@ type Point = {
 
 const VIEWBOX_WIDTH = 520;
 const VIEWBOX_HEIGHT = 240;
-const PADDING_X = 36;
-const PADDING_TOP = 20;
-const PADDING_BOTTOM = 52;
+const PADDING_X = 32;
+const PADDING_TOP = 16;
+const PADDING_BOTTOM = 44;
 
 function buildCurvePath(points: Point[]) {
   if (points.length === 0) {
@@ -65,57 +65,31 @@ export function BellCurveChart({
   }));
 
   const linePath = buildCurvePath(points);
-  const areaPath =
-    points.length > 0
-      ? `${linePath} L ${points[points.length - 1].x} ${VIEWBOX_HEIGHT - PADDING_BOTTOM} L ${points[0].x} ${VIEWBOX_HEIGHT - PADDING_BOTTOM} Z`
-      : "";
 
   return (
-    <div className={cn("rounded-2xl border border-primary/10 bg-white p-4", className)}>
+    <div className={cn("w-full", className)}>
       <svg
         viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
         className="h-auto w-full"
         role="img"
         aria-label="Rozlozenie bachavosti"
       >
-        <defs>
-          <linearGradient id="bachavost-fill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#EC4899" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.04" />
-          </linearGradient>
-        </defs>
-
         <line
           x1={PADDING_X}
           y1={VIEWBOX_HEIGHT - PADDING_BOTTOM}
           x2={VIEWBOX_WIDTH - PADDING_X}
           y2={VIEWBOX_HEIGHT - PADDING_BOTTOM}
-          stroke="#E9D5FF"
-          strokeWidth="2"
+          stroke="currentColor"
+          strokeOpacity="0.15"
+          strokeWidth="1"
         />
 
-        {distribution.map((bucket, index) => {
-          const point = points[index];
-          return (
-            <line
-              key={bucket.score}
-              x1={point.x}
-              y1={PADDING_TOP}
-              x2={point.x}
-              y2={VIEWBOX_HEIGHT - PADDING_BOTTOM}
-              stroke="#F3E8FF"
-              strokeDasharray="4 8"
-            />
-          );
-        })}
-
-        {areaPath ? <path d={areaPath} fill="url(#bachavost-fill)" /> : null}
         {linePath ? (
           <path
             d={linePath}
             fill="none"
-            stroke="#7C3AED"
-            strokeWidth="5"
+            stroke="#4C1D95"
+            strokeWidth="2"
             strokeLinecap="round"
           />
         ) : null}
@@ -123,34 +97,33 @@ export function BellCurveChart({
         {distribution.map((bucket, index) => {
           const point = points[index];
           const active = highlightScore === bucket.score;
+          const r = active ? 5 : 3.5;
 
           return (
             <g key={bucket.score}>
-              {active ? (
-                <line
-                  x1={point.x}
-                  y1={point.y}
-                  x2={point.x}
-                  y2={VIEWBOX_HEIGHT - PADDING_BOTTOM}
-                  stroke="#EC4899"
-                  strokeWidth="3"
-                />
-              ) : null}
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={active ? 10 : 7}
-                fill={active ? "#EC4899" : "#FFFFFF"}
-                stroke={active ? "#BE185D" : "#7C3AED"}
-                strokeWidth={active ? 4 : 3}
+                r={r}
+                fill={active ? "#4C1D95" : "#FFFFFF"}
+                stroke="#4C1D95"
+                strokeWidth={active ? 2 : 1.5}
               />
               <text
                 x={point.x}
-                y={VIEWBOX_HEIGHT - 18}
+                y={VIEWBOX_HEIGHT - 22}
                 textAnchor="middle"
-                className="fill-muted-foreground text-[13px] font-medium"
+                className="fill-muted-foreground text-[12px] font-medium"
               >
                 {bucket.label}
+              </text>
+              <text
+                x={point.x}
+                y={VIEWBOX_HEIGHT - 8}
+                textAnchor="middle"
+                className="fill-muted-foreground text-[10px] tabular-nums opacity-70"
+              >
+                {bucket.percentage}%
               </text>
             </g>
           );
