@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { Navbar } from "@/components/platform/navbar";
 import { BundleManager } from "@/components/platform/bundle-manager";
 import { DashboardView } from "@/components/platform/dashboard-view";
 import { EntryCodeGenerator } from "@/components/platform/entry-code-generator";
@@ -36,24 +35,24 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Navbar />
-      <section className="border-b border-border/60 bg-muted/30">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+      <header className="border-b border-border/60">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+            <span className="font-semibold text-foreground/80">
+              DAVAJ-BACHA
+            </span>
+            <span className="text-foreground/20">/</span>
             <span className="font-medium text-foreground">Dashboard</span>
-            <span aria-hidden="true">·</span>
             <span>{context.schoolName}</span>
-            <span aria-hidden="true">·</span>
             <span>{context.className}</span>
-            <span aria-hidden="true">·</span>
-            <span className="inline-flex items-center gap-1.5 text-foreground/80">
-              <span className="size-1.5 rounded-full bg-emerald-600" />
+            <span className="inline-flex items-center gap-1.5 text-foreground/70">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
               Anonymizované
             </span>
           </div>
           <LogoutButton />
         </div>
-      </section>
+      </header>
 
       <section className="mx-auto max-w-7xl space-y-10 px-5 py-10">
         <header className="space-y-3">
