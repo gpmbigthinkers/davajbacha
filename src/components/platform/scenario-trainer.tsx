@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -96,6 +96,7 @@ function getDisplayedOptions(
 export function ScenarioTrainer({ presentationMode = false }: { presentationMode?: boolean }) {
   const searchParams = useSearchParams();
   const entryCode = searchParams.get("code") ?? undefined;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const sessionToken = useSession(presentationMode, entryCode);
 
   const [templates, setTemplates] = useState<ScenarioTemplate[]>([]);
@@ -105,8 +106,11 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
   const [stepIndex, setStepIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ScenarioFeedback | null>(null);
-  const [attemptId, setAttemptId] = useState<string | undefined>();
-  const [isPending, startTransition] = useTransition();
+
+  const collectedAnswersRef = useRef<
+    Array<{ scenarioSlug: string; stepKey: string; selectedOptionId: string }>
+  >([]);
+  const batchSavedRef = useRef(false);
 
   // Track score across the whole bundle
   const [answeredCount, setAnsweredCount] = useState(0);
@@ -154,7 +158,22 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
 
     let active = true;
 
-    async function loadResultOverview() {
+    async function finishAndSave() {
+      if (!batchSavedRef.current && collectedAnswersRef.current.length > 0) {
+        batchSavedRef.current = true;
+        try {
+          await fetch("/api/scenario/answers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              answers: collectedAnswersRef.current,
+            }),
+          });
+        } catch {
+          // non-critical — dashboard still loads
+        }
+      }
+
       try {
         const response = await fetch("/api/dashboard", { cache: "no-store" });
         const data = (await response.json()) as DashboardOverview;
@@ -169,7 +188,7 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
       }
     }
 
-    loadResultOverview();
+    finishAndSave();
 
     return () => {
       active = false;
@@ -202,7 +221,6 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
       throw new Error("Unknown scenario answer");
     }
     return {
-      attemptId,
       isSafe: opt.isSafe,
       riskDelta: opt.riskDelta,
       feedback: opt.feedback,
@@ -217,11 +235,6 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
 
     setSelectedOptionId(optionId);
     const localFeedback = getLocalFeedback(scenario.slug, step.key, optionId);
-    const activeAttemptId = attemptId ?? crypto.randomUUID();
-
-    if (!attemptId) {
-      setAttemptId(activeAttemptId);
-    }
 
     setFeedback(localFeedback);
 
@@ -230,26 +243,10 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
       setSafeCount((c) => c + 1);
     }
 
-    startTransition(async () => {
-      try {
-        const response = await fetch("/api/scenario/answer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            scenarioSlug: scenario.slug,
-            stepKey: step.key,
-            selectedOptionId: optionId,
-            attemptId: activeAttemptId,
-          }),
-        });
-        const data = (await response.json()) as ScenarioFeedback;
-
-        if (data.attemptId) {
-          setAttemptId(data.attemptId);
-        }
-      } catch {
-        setAttemptId((current) => current ?? crypto.randomUUID());
-      }
+    collectedAnswersRef.current.push({
+      scenarioSlug: scenario.slug,
+      stepKey: step.key,
+      selectedOptionId: optionId,
     });
   }
 
@@ -264,7 +261,6 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
       if (nextScenario < templates.length) {
         setScenarioIndex(nextScenario);
         setStepIndex(0);
-        setAttemptId(undefined);
       } else {
         setFinished(true);
         return;
@@ -280,11 +276,12 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
     setStepIndex(0);
     setSelectedOptionId(null);
     setFeedback(null);
-    setAttemptId(undefined);
     setAnsweredCount(0);
     setSafeCount(0);
     setFinished(false);
     setResultOverview(null);
+    collectedAnswersRef.current = [];
+    batchSavedRef.current = false;
   }
 
   if (loadingTemplates) {
@@ -462,7 +459,6 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
               <Badge variant="outline">
                 Krok {stepIndex + 1} / {scenario.steps.length}
               </Badge>
-              {isPending ? <Badge variant="secondary">ukladám</Badge> : null}
             </div>
             <div>
               <CardTitle className="font-heading text-4xl font-bold">

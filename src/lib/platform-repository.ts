@@ -821,6 +821,107 @@ export async function createScenarioTemplate(
   return template;
 }
 
+export async function recordScenarioAnswers(input: {
+  sessionToken: string;
+  answers: Array<{
+    scenarioSlug: string;
+    stepKey: string;
+    selectedOptionId: string;
+  }>;
+}): Promise<{ success: boolean; attemptIds: string[] }> {
+  if (!db || input.answers.length === 0) {
+    return { success: false, attemptIds: [] };
+  }
+
+  const session = await getOrCreateSession(input.sessionToken);
+  if (!session) {
+    return { success: false, attemptIds: [] };
+  }
+
+  const grouped = new Map<string, typeof input.answers>();
+  for (const a of input.answers) {
+    const entries = grouped.get(a.scenarioSlug) ?? [];
+    entries.push(a);
+    grouped.set(a.scenarioSlug, entries);
+  }
+
+  const attemptIds: string[] = [];
+
+  for (const [slug, answers] of grouped) {
+    const [scenario] = await db
+      .select()
+      .from(scenarioTemplatesTable)
+      .where(eq(scenarioTemplatesTable.slug, slug))
+      .limit(1);
+
+    if (!scenario) continue;
+
+    const steps = await db
+      .select()
+      .from(scenarioSteps)
+      .where(eq(scenarioSteps.scenarioId, scenario.id));
+
+    const stepMap = new Map(steps.map((s) => [s.stepKey, s]));
+
+    const [attempt] = await db
+      .insert(scenarioAttempts)
+      .values({
+        sessionId: session.id,
+        scenarioId: scenario.id,
+        mode: "live",
+        score: 0,
+      })
+      .returning();
+
+    if (!attempt) continue;
+
+    const responses: Array<{
+      attemptId: string;
+      stepId: number;
+      selectedOptionId: string;
+      isSafe: boolean;
+      riskDelta: number;
+    }> = [];
+
+    for (const answer of answers) {
+      const step = stepMap.get(answer.stepKey);
+      if (!step) continue;
+
+      const option = step.options.find((o) => o.id === answer.selectedOptionId);
+      if (!option) continue;
+
+      responses.push({
+        attemptId: attempt.id,
+        stepId: step.id,
+        selectedOptionId: answer.selectedOptionId,
+        isSafe: option.isSafe,
+        riskDelta: option.riskDelta,
+      });
+    }
+
+    if (responses.length > 0) {
+      await db.insert(scenarioResponses).values(responses);
+    }
+
+    const safeCount = responses.filter((r) => r.isSafe).length;
+    const answeredCount = responses.length;
+    const bachavost = calculateBachavost(answeredCount, safeCount);
+    const isCompleted = answeredCount >= steps.length && answeredCount > 0;
+
+    await db
+      .update(scenarioAttempts)
+      .set({
+        score: bachavost,
+        completedAt: isCompleted ? new Date() : null,
+      })
+      .where(eq(scenarioAttempts.id, attempt.id));
+
+    attemptIds.push(attempt.id);
+  }
+
+  return { success: true, attemptIds };
+}
+
 export async function findUserByEmail(email: string) {
   if (!db) return null;
   const [user] = await db
