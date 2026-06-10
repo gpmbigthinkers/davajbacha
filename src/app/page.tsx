@@ -15,7 +15,7 @@ import { getHomepageStats } from "@/lib/platform-repository";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { HeroScene } from "@/components/reactbits/hero-scene";
+import { HeroScene, PhoneMockup } from "@/components/reactbits/hero-scene";
 import { ShinyText } from "@/components/reactbits/shiny-text";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +46,7 @@ export default async function Home() {
           </Link>
         </header>
 
-        <div className="relative z-10 mx-auto grid max-w-7xl px-5 pb-28 pt-24 text-white lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] lg:pb-32 lg:pt-28">
+        <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 pb-28 pt-24 text-white lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:gap-8 lg:pb-32 lg:pt-28">
           <div className="max-w-3xl">
             <Badge className="mb-6 w-fit bg-white/15 text-white ring-1 ring-white/25">
               <ShinyText>Ideathon 2026 | GPM Park mládeže Košice</ShinyText>
@@ -80,7 +80,9 @@ export default async function Home() {
               </Link>
             </div>
           </div>
-          <div className="hidden lg:block" aria-hidden="true" />
+          <div className="relative hidden lg:flex lg:items-center lg:justify-center lg:self-stretch">
+            <PhoneMockup />
+          </div>
         </div>
       </section>
 
