@@ -22,6 +22,7 @@ import {
   getScenarioFeedback,
 } from "@/lib/scoring";
 import type {
+  ChatMessage,
   DashboardOverview,
   HomepageStats,
   ScenarioFeedback,
@@ -190,6 +191,71 @@ export async function recordScenarioAnswer(input: {
     riskDelta: option.riskDelta,
   });
 
+  await finalizeScenarioAttempt(attempt.id, scenario.id);
+
+  return {
+    attemptId: attempt.id,
+    isSafe: option.isSafe,
+    riskDelta: option.riskDelta,
+    feedback: option.feedback,
+    principle: option.principle,
+  };
+}
+
+function mapScenarioStepRow(step: typeof scenarioSteps.$inferSelect) {
+  return {
+    id: step.id,
+    key: step.stepKey,
+    title: step.title,
+    order: step.order,
+    situation: step.situation,
+    question: step.question,
+    options: step.options,
+    messages: step.messages ?? undefined,
+    interactionMode: step.interactionMode ?? "multiple_choice",
+    chatConfig: step.chatConfig ?? undefined,
+  };
+}
+
+export async function resolveScenarioStep(input: {
+  scenarioSlug: string;
+  stepKey: string;
+}) {
+  if (!db) return null;
+
+  const [scenario] = await db
+    .select()
+    .from(scenarioTemplatesTable)
+    .where(eq(scenarioTemplatesTable.slug, input.scenarioSlug))
+    .limit(1);
+
+  if (!scenario) return null;
+
+  const [step] = await db
+    .select()
+    .from(scenarioSteps)
+    .where(
+      and(
+        eq(scenarioSteps.scenarioId, scenario.id),
+        eq(scenarioSteps.stepKey, input.stepKey)
+      )
+    )
+    .limit(1);
+
+  if (!step) return null;
+
+  return {
+    scenario,
+    step,
+  };
+}
+
+async function finalizeScenarioAttempt(
+  attemptId: string,
+  scenarioId: number
+) {
+  if (!db) return;
+
   const [attemptStats] = await db
     .select({
       total: sql<number>`count(*)`.mapWith(Number),
@@ -199,12 +265,20 @@ export async function recordScenarioAnswer(input: {
         ),
     })
     .from(scenarioResponses)
-    .where(eq(scenarioResponses.attemptId, attempt.id));
+    .where(eq(scenarioResponses.attemptId, attemptId));
 
   const [{ totalSteps }] = await db
     .select({ totalSteps: sql<number>`count(*)`.mapWith(Number) })
     .from(scenarioSteps)
-    .where(eq(scenarioSteps.scenarioId, scenario.id));
+    .where(eq(scenarioSteps.scenarioId, scenarioId));
+
+  const [attempt] = await db
+    .select()
+    .from(scenarioAttempts)
+    .where(eq(scenarioAttempts.id, attemptId))
+    .limit(1);
+
+  if (!attempt) return;
 
   const answeredCount = attemptStats?.total ?? 0;
   const safeCount = attemptStats?.safeCount ?? 0;
@@ -217,14 +291,81 @@ export async function recordScenarioAnswer(input: {
       score: bachavost,
       completedAt: isCompleted ? new Date() : attempt.completedAt ?? null,
     })
-    .where(eq(scenarioAttempts.id, attempt.id));
+    .where(eq(scenarioAttempts.id, attemptId));
+}
+
+export async function recordScenarioFreeResponse(input: {
+  sessionToken: string;
+  scenarioSlug: string;
+  stepKey: string;
+  attemptId?: string;
+  feedback: ScenarioFeedback;
+  conversation: ChatMessage[];
+  freeTextAnswer: string;
+}): Promise<ScenarioFeedback> {
+  const defaultFeedback: ScenarioFeedback = {
+    attemptId: input.attemptId ?? randomUUID(),
+    ...input.feedback,
+  };
+
+  if (!db) {
+    return defaultFeedback;
+  }
+
+  const session = await getOrCreateSession(input.sessionToken);
+  const resolved = await resolveScenarioStep({
+    scenarioSlug: input.scenarioSlug,
+    stepKey: input.stepKey,
+  });
+
+  if (!session || !resolved) {
+    return defaultFeedback;
+  }
+
+  const { scenario, step } = resolved;
+
+  let attempt = null;
+
+  if (input.attemptId) {
+    [attempt] = await db
+      .select()
+      .from(scenarioAttempts)
+      .where(eq(scenarioAttempts.id, input.attemptId))
+      .limit(1);
+  }
+
+  if (!attempt) {
+    [attempt] = await db
+      .insert(scenarioAttempts)
+      .values({
+        id: input.attemptId,
+        sessionId: session.id,
+        scenarioId: scenario.id,
+        mode: "live",
+        score: 0,
+      })
+      .returning();
+  }
+
+  if (!attempt) {
+    return defaultFeedback;
+  }
+
+  await db.insert(scenarioResponses).values({
+    attemptId: attempt.id,
+    stepId: step.id,
+    selectedOptionId: input.feedback.matchedOptionId ?? null,
+    freeTextAnswer: input.freeTextAnswer,
+    conversationLog: input.conversation,
+    isSafe: input.feedback.isSafe,
+    riskDelta: input.feedback.riskDelta,
+  });
+
+  await finalizeScenarioAttempt(attempt.id, scenario.id);
 
   return {
+    ...input.feedback,
     attemptId: attempt.id,
-    isSafe: option.isSafe,
-    riskDelta: option.riskDelta,
-    feedback: option.feedback,
-    principle: option.principle,
   };
 }
 
@@ -676,16 +817,7 @@ export async function getBundleScenarios(bundleId: number) {
     steps: steps
       .filter((s) => s.scenarioId === template.id)
       .sort((a, b) => a.order - b.order)
-      .map((s) => ({
-        id: s.id,
-        key: s.stepKey,
-        title: s.title,
-        order: s.order,
-        situation: s.situation,
-        question: s.question,
-        options: s.options,
-        messages: s.messages ?? undefined,
-      })),
+      .map((s) => mapScenarioStepRow(s)),
   }));
 
   return full.sort((a, b) => a.order - b.order);
@@ -786,6 +918,8 @@ export async function createScenarioTemplate(
         isSafe: boolean;
       }>;
       messages?: Array<{ sender: "user" | "other"; name: string; message: string; timestamp?: string }>;
+      interactionMode?: "multiple_choice" | "interactive_chat";
+      chatConfig?: { botName: string; maxTurns?: number };
     }>;
   }
 ) {
@@ -814,6 +948,9 @@ export async function createScenarioTemplate(
         situation: step.situation,
         question: step.question,
         options: step.options,
+        messages: step.messages ?? null,
+        interactionMode: step.interactionMode ?? "multiple_choice",
+        chatConfig: step.chatConfig ?? null,
       }))
     );
   }
@@ -855,6 +992,8 @@ export async function getScenarioTemplatesWithSteps(): Promise<
         isSafe: boolean;
       }>;
       messages?: Array<{ sender: "user" | "other"; name: string; message: string; timestamp?: string }> | null;
+      interactionMode: "multiple_choice" | "interactive_chat";
+      chatConfig?: { botName: string; maxTurns?: number };
     }>;
   }>
 > {
@@ -873,16 +1012,7 @@ export async function getScenarioTemplatesWithSteps(): Promise<
     steps: steps
       .filter((s) => s.scenarioId === template.id)
       .sort((a, b) => a.order - b.order)
-      .map((s) => ({
-        id: s.id,
-        key: s.stepKey,
-        title: s.title,
-        order: s.order,
-        situation: s.situation,
-        question: s.question,
-        options: s.options,
-        messages: s.messages ?? undefined,
-      })),
+      .map((s) => mapScenarioStepRow(s)),
   }));
 }
 
@@ -930,6 +1060,8 @@ export async function updateScenarioStep(
       isSafe: boolean;
     }>;
     messages?: Array<{ sender: "user" | "other"; name: string; message: string; timestamp?: string }> | null;
+    interactionMode?: "multiple_choice" | "interactive_chat";
+    chatConfig?: { botName: string; maxTurns?: number } | null;
   }
 ) {
   if (!db) return null;

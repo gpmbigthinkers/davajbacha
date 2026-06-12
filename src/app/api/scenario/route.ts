@@ -46,6 +46,13 @@ const createSchema = z.object({
           isSafe: z.boolean(),
         })
       ),
+      interactionMode: z.enum(["multiple_choice", "interactive_chat"]).optional(),
+      chatConfig: z
+        .object({
+          botName: z.string().min(1).max(80),
+          maxTurns: z.number().int().min(1).max(12).optional(),
+        })
+        .optional(),
     })
   ),
 });
@@ -142,6 +149,14 @@ const updateStepSchema = z.object({
         isSafe: z.boolean(),
       })
     )
+    .optional(),
+  interactionMode: z.enum(["multiple_choice", "interactive_chat"]).optional(),
+  chatConfig: z
+    .object({
+      botName: z.string().min(1).max(80),
+      maxTurns: z.number().int().min(1).max(12).optional(),
+    })
+    .nullable()
     .optional(),
 });
 

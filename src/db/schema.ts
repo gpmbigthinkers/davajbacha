@@ -11,7 +11,13 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import type { ChatMessage, ScenarioOption, ThreatCategory } from "../lib/platform-types";
+import type {
+  ChatMessage,
+  ScenarioChatConfig,
+  ScenarioInteractionMode,
+  ScenarioOption,
+  ThreatCategory,
+} from "../lib/platform-types";
 
 export const schools = pgTable(
   "schools",
@@ -74,6 +80,11 @@ export const scenarioSteps = pgTable(
     question: text("question").notNull(),
     options: jsonb("options").$type<ScenarioOption[]>().notNull(),
     messages: jsonb("messages").$type<ChatMessage[]>(),
+    interactionMode: varchar("interaction_mode", { length: 24 })
+      .$type<ScenarioInteractionMode>()
+      .default("multiple_choice")
+      .notNull(),
+    chatConfig: jsonb("chat_config").$type<ScenarioChatConfig>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -106,7 +117,9 @@ export const scenarioResponses = pgTable("scenario_responses", {
   stepId: integer("step_id")
     .notNull()
     .references(() => scenarioSteps.id, { onDelete: "cascade" }),
-  selectedOptionId: varchar("selected_option_id", { length: 96 }).notNull(),
+  selectedOptionId: varchar("selected_option_id", { length: 96 }),
+  freeTextAnswer: text("free_text_answer"),
+  conversationLog: jsonb("conversation_log").$type<ChatMessage[]>(),
   isSafe: boolean("is_safe").notNull(),
   riskDelta: integer("risk_delta").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

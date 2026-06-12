@@ -54,6 +54,11 @@ type ScenarioStep = {
   question: string;
   options: ScenarioOption[];
   messages?: ChatMessage[] | null;
+  interactionMode?: "multiple_choice" | "interactive_chat";
+  chatConfig?: {
+    botName: string;
+    maxTurns?: number;
+  };
 };
 
 type Scenario = {
@@ -216,6 +221,11 @@ export function ScenarioManager() {
             question: step.question,
             options: step.options,
             messages: step.messages ?? null,
+            interactionMode: step.interactionMode ?? "multiple_choice",
+            chatConfig:
+              step.interactionMode === "interactive_chat"
+                ? step.chatConfig ?? { botName: "Neznámy", maxTurns: 6 }
+                : null,
           }),
         });
         if (!stepRes.ok) throw new Error("step save failed");
@@ -246,6 +256,12 @@ export function ScenarioManager() {
             situation: s.situation,
             question: s.question,
             options: s.options,
+            messages: s.messages ?? undefined,
+            interactionMode: s.interactionMode ?? "multiple_choice",
+            chatConfig:
+              s.interactionMode === "interactive_chat"
+                ? s.chatConfig ?? { botName: "Neznámy", maxTurns: 6 }
+                : undefined,
           })),
         }),
       });
@@ -742,6 +758,77 @@ export function ScenarioManager() {
                           />
                         </div>
 
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Typ interakcie</Label>
+                            <select
+                              className="h-10 w-full rounded-md border bg-white px-3 text-sm"
+                              value={step.interactionMode ?? "multiple_choice"}
+                              onChange={(e) => {
+                                const interactionMode = e.target
+                                  .value as ScenarioStep["interactionMode"];
+                                const lastOther = [...(step.messages ?? [])]
+                                  .reverse()
+                                  .find((message) => message.sender === "other");
+
+                                updateStep(scenario.id, step.id, {
+                                  interactionMode,
+                                  chatConfig:
+                                    interactionMode === "interactive_chat"
+                                      ? {
+                                          botName:
+                                            step.chatConfig?.botName ??
+                                            lastOther?.name ??
+                                            "Neznámy",
+                                          maxTurns: step.chatConfig?.maxTurns ?? 6,
+                                        }
+                                      : undefined,
+                                });
+                              }}
+                            >
+                              <option value="multiple_choice">Výber A/B</option>
+                              <option value="interactive_chat">Interaktívny chat</option>
+                            </select>
+                          </div>
+                          {(step.interactionMode ?? "multiple_choice") ===
+                          "interactive_chat" ? (
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Meno AI postavy</Label>
+                                <Input
+                                  value={step.chatConfig?.botName ?? ""}
+                                  onChange={(e) =>
+                                    updateStep(scenario.id, step.id, {
+                                      chatConfig: {
+                                        botName: e.target.value,
+                                        maxTurns: step.chatConfig?.maxTurns ?? 6,
+                                      },
+                                    })
+                                  }
+                                  placeholder="Napr. Lukas_14"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Max. správ študenta</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={12}
+                                  value={step.chatConfig?.maxTurns ?? 6}
+                                  onChange={(e) =>
+                                    updateStep(scenario.id, step.id, {
+                                      chatConfig: {
+                                        botName: step.chatConfig?.botName ?? "Neznámy",
+                                        maxTurns: Number(e.target.value) || 6,
+                                      },
+                                    })
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+
                         <div className="space-y-2">
                           <Label className="flex items-center gap-1">
                             <FileText className="size-3.5" /> Situácia
@@ -880,8 +967,21 @@ export function ScenarioManager() {
                           )}
                         </div>
 
+                        {(step.interactionMode ?? "multiple_choice") ===
+                        "interactive_chat" &&
+                        (step.messages ?? []).length === 0 ? (
+                          <p className="text-sm text-amber-700">
+                            Pre interaktívny chat pridaj aspoň jednu úvodnú chat správu.
+                          </p>
+                        ) : null}
+
                         <div className="space-y-3">
-                          <p className="text-sm font-semibold">Odpovede</p>
+                          <p className="text-sm font-semibold">
+                            {(step.interactionMode ?? "multiple_choice") ===
+                            "interactive_chat"
+                              ? "Referenčné odpovede pre AI hodnotenie"
+                              : "Odpovede"}
+                          </p>
                           {step.options.map((opt) => (
                             <div
                               key={opt.id}

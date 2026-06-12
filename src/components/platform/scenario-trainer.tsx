@@ -6,14 +6,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
-  MessageCircle,
   RotateCcw,
   ShieldAlert,
   Trophy,
-  User,
 } from "lucide-react";
 
 import { BellCurveChart } from "@/components/platform/bell-curve-chart";
+import { ScenarioChatPanel } from "@/components/platform/scenario-chat-panel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,21 +24,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/hooks/use-session";
 import { threatLabels } from "@/lib/platform-data";
+import {
+  ScenarioChatError,
+  sendScenarioChatMessage,
+  submitScenarioEvaluation,
+} from "@/lib/scenario-chat-client";
+import {
+  countUserTurns,
+  resolveMaxTurns,
+} from "@/lib/scenario-chat-verification";
 import { calculateBachavost } from "@/lib/scoring";
 import type {
+  ChatMessage,
   DashboardOverview,
+  ScenarioChatConfig,
   ScenarioFeedback,
+  ScenarioInteractionMode,
 } from "@/lib/platform-types";
 import { cn } from "@/lib/utils";
-
-type ChatMessage = {
-  sender: "user" | "other";
-  name: string;
-  message: string;
-  timestamp?: string;
-};
 
 type ScenarioOption = {
   id: string;
@@ -58,6 +63,8 @@ type ScenarioStep = {
   question: string;
   options: ScenarioOption[];
   messages?: ChatMessage[] | null;
+  interactionMode?: ScenarioInteractionMode;
+  chatConfig?: ScenarioChatConfig;
 };
 
 type ScenarioTemplate = {
@@ -107,6 +114,11 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
   const [feedback, setFeedback] = useState<ScenarioFeedback | null>(null);
   const [attemptId, setAttemptId] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
+  const [chatExtensions, setChatExtensions] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [isChatPending, setIsChatPending] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   // Track score across the whole bundle
   const [answeredCount, setAnsweredCount] = useState(0);
@@ -178,9 +190,15 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
 
   const scenario = templates[scenarioIndex];
   const step = scenario?.steps[stepIndex];
+  const interactionMode = step?.interactionMode ?? "multiple_choice";
+  const isInteractiveChat = interactionMode === "interactive_chat";
   const displayedOptions =
     scenario && step ? getDisplayedOptions(scenario.slug, step.key, step.options) : [];
-  const canRevealScenarioMeta = Boolean(selectedOptionId);
+  const baseMessages = step?.messages ?? [];
+  const liveConversation = [...baseMessages, ...chatExtensions];
+  const maxTurns = resolveMaxTurns(step?.chatConfig);
+  const userTurnCount = countUserTurns(chatExtensions);
+  const canRevealScenarioMeta = Boolean(selectedOptionId || feedback);
   const visibleTemplates = templates.slice(0, scenarioIndex + 1);
 
   const totalSteps = templates.reduce((sum, t) => sum + t.steps.length, 0);
@@ -253,6 +271,94 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
     });
   }
 
+  async function sendChatMessage() {
+    if (!scenario || !step || feedback || isChatPending || isEvaluating) {
+      return;
+    }
+
+    const trimmed = chatInput.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    if (userTurnCount >= maxTurns) {
+      setChatError("Dosiahol si maximálny počet správ. Odošli odpoveď na vyhodnotenie.");
+      return;
+    }
+
+    setChatError(null);
+    setIsChatPending(true);
+
+    try {
+      const reply = await sendScenarioChatMessage({
+        scenarioSlug: scenario.slug,
+        stepKey: step.key,
+        conversation: liveConversation,
+        userMessage: trimmed,
+      });
+
+      setChatExtensions((current) => [
+        ...current,
+        {
+          sender: "user",
+          name: "Ty",
+          message: trimmed,
+        },
+        reply,
+      ]);
+      setChatInput("");
+    } catch (error) {
+      setChatError(
+        error instanceof ScenarioChatError
+          ? error.message
+          : "Správu sa nepodarilo odoslať. Skús to znova."
+      );
+    } finally {
+      setIsChatPending(false);
+    }
+  }
+
+  async function evaluateChatResponse() {
+    if (!scenario || !step || feedback || isEvaluating || userTurnCount < 1) {
+      return;
+    }
+
+    setChatError(null);
+    setIsEvaluating(true);
+
+    const activeAttemptId = attemptId ?? crypto.randomUUID();
+
+    if (!attemptId) {
+      setAttemptId(activeAttemptId);
+    }
+
+    try {
+      const result = await submitScenarioEvaluation({
+        scenarioSlug: scenario.slug,
+        stepKey: step.key,
+        conversation: liveConversation,
+        attemptId: activeAttemptId,
+      });
+
+      setFeedback(result);
+      setAnsweredCount((count) => count + 1);
+      if (result.isSafe) {
+        setSafeCount((count) => count + 1);
+      }
+      if (result.attemptId) {
+        setAttemptId(result.attemptId);
+      }
+    } catch (error) {
+      setChatError(
+        error instanceof ScenarioChatError
+          ? error.message
+          : "Odpoveď sa nepodarilo vyhodnotiť. Skús to znova."
+      );
+    } finally {
+      setIsEvaluating(false);
+    }
+  }
+
   function next() {
     if (!scenario || !step) return;
     const nextStep = stepIndex + 1;
@@ -273,6 +379,11 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
 
     setSelectedOptionId(null);
     setFeedback(null);
+    setChatExtensions([]);
+    setChatInput("");
+    setChatError(null);
+    setIsChatPending(false);
+    setIsEvaluating(false);
   }
 
   function reset() {
@@ -285,6 +396,11 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
     setSafeCount(0);
     setFinished(false);
     setResultOverview(null);
+    setChatExtensions([]);
+    setChatInput("");
+    setChatError(null);
+    setIsChatPending(false);
+    setIsEvaluating(false);
   }
 
   if (loadingTemplates) {
@@ -462,7 +578,12 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
               <Badge variant="outline">
                 Krok {stepIndex + 1} / {scenario.steps.length}
               </Badge>
-              {isPending ? <Badge variant="secondary">ukladám</Badge> : null}
+              {isPending || isChatPending || isEvaluating ? (
+                <Badge variant="secondary">ukladám</Badge>
+              ) : null}
+              {isInteractiveChat ? (
+                <Badge variant="outline">Interaktívny chat</Badge>
+              ) : null}
             </div>
             <div>
               <CardTitle className="font-heading text-4xl font-bold">
@@ -474,62 +595,20 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {step.messages && step.messages.length > 0 ? (
-              <div className="rounded-lg border bg-[#E8E8ED] p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary">
-                  <MessageCircle className="size-4" />
-                  Chat
+            {isInteractiveChat ? (
+              baseMessages.length > 0 || chatExtensions.length > 0 ? (
+                <ScenarioChatPanel messages={liveConversation} />
+              ) : (
+                <div className="rounded-lg border bg-secondary/80 p-5">
+                  <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-primary">
+                    <ShieldAlert className="size-4" />
+                    Situácia
+                  </div>
+                  <p className="text-lg leading-8">{step.situation}</p>
                 </div>
-                <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {step.messages.map((msg, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "flex gap-2",
-                        msg.sender === "user" ? "justify-end" : "justify-start"
-                      )}
-                    >
-                      {msg.sender === "other" && (
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#EC4899] text-white">
-                          <User className="size-4" />
-                        </div>
-                      )}
-                      <div
-                        className={cn(
-                          "max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                          msg.sender === "user"
-                            ? "bg-[#EC4899] text-white rounded-br-md"
-                            : "bg-white text-foreground rounded-bl-md shadow-sm"
-                        )}
-                      >
-                        {msg.sender === "other" && (
-                          <p className="mb-0.5 text-xs font-semibold text-[#EC4899]">
-                            {msg.name}
-                          </p>
-                        )}
-                        <p>{msg.message}</p>
-                        {msg.timestamp && (
-                          <p
-                            className={cn(
-                              "mt-1 text-right text-[10px]",
-                              msg.sender === "user"
-                                ? "text-white/70"
-                                : "text-muted-foreground"
-                            )}
-                          >
-                            {msg.timestamp}
-                          </p>
-                        )}
-                      </div>
-                      {msg.sender === "user" && (
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-white">
-                          <User className="size-4" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              )
+            ) : step.messages && step.messages.length > 0 ? (
+              <ScenarioChatPanel messages={step.messages} />
             ) : (
               <div className="rounded-lg border bg-secondary/80 p-5">
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-primary">
@@ -542,30 +621,84 @@ export function ScenarioTrainer({ presentationMode = false }: { presentationMode
 
             <div>
               <h2 className="font-heading text-2xl font-bold">{step.question}</h2>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {displayedOptions.map((option) => {
-                  const selected = selectedOptionId === option.id;
 
-                  return (
-                    <button
-                      key={option.id}
-                      className={cn(
-                        "min-h-32 rounded-lg border bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md disabled:cursor-not-allowed",
-                        selected &&
-                          (option.isSafe
-                            ? "border-[#0F766E] bg-[#E7F7F3]"
-                            : "border-[#FF6B6B] bg-[#FFF0F0]")
-                      )}
-                      disabled={Boolean(selectedOptionId)}
-                      onClick={() => answer(option.id)}
+              {isInteractiveChat ? (
+                <div className="mt-4 space-y-4">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Napíš vlastnú odpoveď a pokračuj v chate.</span>
+                    <span>
+                      Správy: {userTurnCount}/{maxTurns}
+                    </span>
+                  </div>
+                  <Textarea
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    placeholder="Napíš, čo by si odpovedal/a..."
+                    rows={3}
+                    disabled={Boolean(feedback) || isChatPending || isEvaluating || userTurnCount >= maxTurns}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendChatMessage();
+                      }
+                    }}
+                  />
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => void sendChatMessage()}
+                      disabled={
+                        Boolean(feedback) ||
+                        isChatPending ||
+                        isEvaluating ||
+                        !chatInput.trim() ||
+                        userTurnCount >= maxTurns
+                      }
                     >
-                      <span className="text-base font-semibold leading-6">
-                        {option.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      {isChatPending ? "Odosielam..." : "Odoslať správu"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => void evaluateChatResponse()}
+                      disabled={
+                        Boolean(feedback) ||
+                        isEvaluating ||
+                        isChatPending ||
+                        userTurnCount < 1
+                      }
+                    >
+                      {isEvaluating ? "Vyhodnocujem..." : "Odoslať a vyhodnotiť"}
+                    </Button>
+                  </div>
+                  {chatError ? (
+                    <p className="text-sm text-destructive">{chatError}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {displayedOptions.map((option) => {
+                    const selected = selectedOptionId === option.id;
+
+                    return (
+                      <button
+                        key={option.id}
+                        className={cn(
+                          "min-h-32 rounded-lg border bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md disabled:cursor-not-allowed",
+                          selected &&
+                            (option.isSafe
+                              ? "border-[#0F766E] bg-[#E7F7F3]"
+                              : "border-[#FF6B6B] bg-[#FFF0F0]")
+                        )}
+                        disabled={Boolean(selectedOptionId)}
+                        onClick={() => answer(option.id)}
+                      >
+                        <span className="text-base font-semibold leading-6">
+                          {option.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {feedback ? (

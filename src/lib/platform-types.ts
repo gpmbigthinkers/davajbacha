@@ -21,6 +21,13 @@ export type ScenarioOption = {
   isSafe: boolean;
 };
 
+export type ScenarioInteractionMode = "multiple_choice" | "interactive_chat";
+
+export type ScenarioChatConfig = {
+  botName: string;
+  maxTurns?: number;
+};
+
 export type ScenarioStep = {
   key: string;
   title: string;
@@ -28,6 +35,8 @@ export type ScenarioStep = {
   question: string;
   options: ScenarioOption[];
   messages?: ChatMessage[];
+  interactionMode?: ScenarioInteractionMode;
+  chatConfig?: ScenarioChatConfig;
 };
 
 export type ScenarioTemplate = {
@@ -45,6 +54,7 @@ export type ScenarioFeedback = {
   riskDelta: number;
   feedback: string;
   principle: string;
+  matchedOptionId?: string;
 };
 
 export type BachavostBucket = {
