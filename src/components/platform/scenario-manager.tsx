@@ -72,6 +72,31 @@ type Scenario = {
   steps: ScenarioStep[];
 };
 
+function buildStepSavePayload(step: ScenarioStep) {
+  const interactionMode = step.interactionMode ?? "multiple_choice";
+  const lastOtherName = [...(step.messages ?? [])]
+    .reverse()
+    .find((message) => message.sender === "other")
+    ?.name?.trim();
+
+  return {
+    title: step.title,
+    situation: step.situation,
+    question: step.question,
+    options: step.options,
+    messages: step.messages ?? null,
+    interactionMode,
+    chatConfig:
+      interactionMode === "interactive_chat"
+        ? {
+            botName:
+              step.chatConfig?.botName?.trim() || lastOtherName || "Neznámy",
+            maxTurns: step.chatConfig?.maxTurns ?? 6,
+          }
+        : null,
+  };
+}
+
 export function ScenarioManager() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,24 +241,26 @@ export function ScenarioManager() {
         const stepRes = await fetch(`/api/scenario?stepId=${step.id}`, {
           method: "PATCH",
           headers: csrfHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({
-            title: step.title,
-            situation: step.situation,
-            question: step.question,
-            options: step.options,
-            messages: step.messages ?? null,
-            interactionMode: step.interactionMode ?? "multiple_choice",
-            chatConfig:
-              step.interactionMode === "interactive_chat"
-                ? step.chatConfig ?? { botName: "Neznámy", maxTurns: 6 }
-                : null,
-          }),
+          body: JSON.stringify(buildStepSavePayload(step)),
         });
-        if (!stepRes.ok) throw new Error("step save failed");
+        if (!stepRes.ok) {
+          let message = `Krok "${step.title}" sa nepodarilo uložiť.`;
+          try {
+            const data = (await stepRes.json()) as { error?: string };
+            if (data.error) {
+              message = `${message} ${data.error}`;
+            }
+          } catch {
+            // ignore parse errors
+          }
+          throw new Error(message);
+        }
       }
-    } catch {
+    } catch (error) {
       window.alert(
-        "Scenár sa nepodarilo uložiť. Skús sa znova prihlásiť a potom uložiť zmeny."
+        error instanceof Error
+          ? error.message
+          : "Scenár sa nepodarilo uložiť. Skús sa znova prihlásiť a potom uložiť zmeny."
       );
     } finally {
       setSavingId(null);
@@ -261,10 +288,7 @@ export function ScenarioManager() {
             options: s.options,
             messages: s.messages ?? undefined,
             interactionMode: s.interactionMode ?? "multiple_choice",
-            chatConfig:
-              s.interactionMode === "interactive_chat"
-                ? s.chatConfig ?? { botName: "Neznámy", maxTurns: 6 }
-                : undefined,
+            chatConfig: buildStepSavePayload(s).chatConfig ?? undefined,
           })),
         }),
       });

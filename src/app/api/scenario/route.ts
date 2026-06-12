@@ -24,7 +24,7 @@ const createSchema = z.object({
       key: z.string(),
       title: z.string(),
       order: z.number(),
-      situation: z.string().min(1).max(2000),
+      situation: z.string().max(2000),
       question: z.string(),
       messages: z
         .array(
@@ -49,7 +49,7 @@ const createSchema = z.object({
       interactionMode: z.enum(["multiple_choice", "interactive_chat"]).optional(),
       chatConfig: z
         .object({
-          botName: z.string().min(1).max(80),
+          botName: z.string().max(80),
           maxTurns: z.number().int().min(1).max(12).optional(),
         })
         .optional(),
@@ -125,7 +125,7 @@ export async function PUT(request: Request) {
 
 const updateStepSchema = z.object({
   title: z.string().min(1).max(160).optional(),
-  situation: z.string().min(1).max(2000).optional(),
+  situation: z.string().max(2000).optional(),
   question: z.string().min(1).max(500).optional(),
   messages: z
     .array(
@@ -153,7 +153,7 @@ const updateStepSchema = z.object({
   interactionMode: z.enum(["multiple_choice", "interactive_chat"]).optional(),
   chatConfig: z
     .object({
-      botName: z.string().min(1).max(80),
+      botName: z.string().max(80),
       maxTurns: z.number().int().min(1).max(12).optional(),
     })
     .nullable()
@@ -177,7 +177,18 @@ export async function PATCH(request: Request) {
     }
 
     const body = updateStepSchema.parse(await request.json());
-    const updated = await updateScenarioStep(stepId, body);
+    const updated = await updateScenarioStep(stepId, {
+      ...body,
+      chatConfig:
+        body.chatConfig === undefined
+          ? undefined
+          : body.chatConfig
+            ? {
+                ...body.chatConfig,
+                botName: body.chatConfig.botName.trim() || "Neznámy",
+              }
+            : null,
+    });
 
     if (!updated) {
       return Response.json({ error: "Not found" }, { status: 404 });
