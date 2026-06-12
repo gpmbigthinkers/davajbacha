@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { csrfHeaders } from "@/lib/csrf-client";
 import { threatLabels } from "@/lib/platform-data";
 
 type ScenarioOption = {
@@ -203,7 +204,7 @@ export function ScenarioManager() {
     try {
       const templateRes = await fetch(`/api/scenario?id=${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           title: scenario.title,
           summary: scenario.summary,
@@ -214,7 +215,7 @@ export function ScenarioManager() {
       for (const step of scenario.steps) {
         const stepRes = await fetch(`/api/scenario?stepId=${step.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             title: step.title,
             situation: step.situation,
@@ -231,7 +232,9 @@ export function ScenarioManager() {
         if (!stepRes.ok) throw new Error("step save failed");
       }
     } catch {
-      // could show toast
+      window.alert(
+        "Scenár sa nepodarilo uložiť. Skús sa znova prihlásiť a potom uložiť zmeny."
+      );
     } finally {
       setSavingId(null);
     }
@@ -243,7 +246,7 @@ export function ScenarioManager() {
     try {
       const res = await fetch("/api/scenario", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           slug: newScenario.slug.trim(),
           title: newScenario.title.trim(),
@@ -320,6 +323,7 @@ export function ScenarioManager() {
     try {
       const res = await fetch(`/api/scenario?id=${id}`, {
         method: "DELETE",
+        headers: csrfHeaders(),
       });
 
       if (!res.ok) {
