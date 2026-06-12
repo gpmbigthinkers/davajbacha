@@ -4,7 +4,11 @@ import { getSessionUser } from "@/lib/auth";
 import { chatCompletionStructured } from "@/lib/openrouter";
 import { db } from "@/db/client";
 import { scenarioSteps, scenarioTemplates } from "@/db/schema";
-import type { ThreatCategory } from "@/lib/platform-types";
+import { buildChatConfigFromMessages } from "@/lib/scenario-chat-verification";
+import type {
+  ScenarioInteractionMode,
+  ThreatCategory,
+} from "@/lib/platform-types";
 import { rateLimitGuard } from "@/lib/rate-limit";
 import { csrfGuard } from "@/lib/csrf";
 
@@ -18,6 +22,9 @@ const requestSchema = z.object({
     .max(5),
   scenarioCount: z.number().min(1).max(5).default(3),
   topicHint: z.string().max(200).optional(),
+  interactionMode: z
+    .enum(["multiple_choice", "interactive_chat"])
+    .default("multiple_choice"),
 });
 
 type GeneratedMessage = {
@@ -57,6 +64,33 @@ type GeneratedScenario = {
 type AiResponse = {
   scenarios: GeneratedScenario[];
 };
+
+type GeneratedStepWithMode = GeneratedStep & {
+  interactionMode?: ScenarioInteractionMode;
+  chatConfig?: { botName: string; maxTurns?: number };
+};
+
+type GeneratedScenarioWithMode = Omit<GeneratedScenario, "steps"> & {
+  steps: GeneratedStepWithMode[];
+};
+
+function enrichScenariosForInteractionMode(
+  scenarios: GeneratedScenario[],
+  interactionMode: ScenarioInteractionMode
+): GeneratedScenarioWithMode[] {
+  if (interactionMode !== "interactive_chat") {
+    return scenarios;
+  }
+
+  return scenarios.map((scenario) => ({
+    ...scenario,
+    steps: scenario.steps.map((step) => ({
+      ...step,
+      interactionMode: "interactive_chat" as const,
+      chatConfig: buildChatConfigFromMessages(step.messages),
+    })),
+  }));
+}
 
 const SYSTEM_PROMPT = `Si expert na kybernetickú bezpečnosť pre tínedžerov na Slovensku. Tvojou úlohou je generovať realistické chatové simulácie, ktoré učia študentov rozpoznávať online hrozby.
 
@@ -157,9 +191,20 @@ export async function POST(request: Request) {
     ? `\nTéma/námet od učiteľa: "${body.topicHint}"`
     : "";
 
+  const interactiveChatInstructions =
+    body.interactionMode === "interactive_chat"
+      ? `
+
+Režim interaktívneho chatu:
+- Každý krok bude študent riešiť písaním vlastných správ v chate, nie výberom tlačidiel A/B.
+- Pole options stále vyplň ako referenčné bezpečné a rizikové odpovede pre AI hodnotenie (label, feedback, principle).
+- Otázka (question) má vyzvať študenta, čo napíše ďalej v chate.
+- Konverzácia musí končiť v bode, kde je prirodzené, aby študent odpovedal vlastnou správou.`
+      : "";
+
   const userPrompt = `Vygeneruj ${body.scenarioCount} unikátne scenáre pre kategórie: ${categoryList}.${topicLine}
 
-Každý scenár musí mať 2-3 kroky s realistickými chatovými konverzáciami. Použi rôznorodé situácie - kombinuj rôzne platformy (Instagram, WhatsApp, TikTok, Discord, Snapchat) a rôzne typy hrozieb.
+Každý scenár musí mať 2-3 kroky s realistickými chatovými konverzáciami. Použi rôznorodé situácie - kombinuj rôzne platformy (Instagram, WhatsApp, TikTok, Discord, Snapchat) a rôzne typy hrozieb.${interactiveChatInstructions}
 
 Interné riskDelta čísla patria iba do JSON poľa riskDelta. V žiadnom inom texte nesmú byť uvedené body, skóre ani hodnoty ako +25 alebo -15.
 
@@ -181,7 +226,12 @@ Dôležité: odpovedz IBA čistým JSON-om, bez markdown formátovania.`;
       );
     }
 
-    return Response.json(result);
+    return Response.json({
+      scenarios: enrichScenariosForInteractionMode(
+        result.scenarios,
+        body.interactionMode
+      ),
+    });
   } catch (err) {
     console.error("AI bundle generation failed:", err);
     return Response.json(
@@ -223,6 +273,15 @@ const saveSchema = z.object({
             isSafe: z.boolean(),
           })
         ),
+        interactionMode: z
+          .enum(["multiple_choice", "interactive_chat"])
+          .optional(),
+        chatConfig: z
+          .object({
+            botName: z.string().max(80),
+            maxTurns: z.number().int().min(1).max(12).optional(),
+          })
+          .optional(),
       })
     ),
   }),
@@ -277,6 +336,16 @@ export async function PUT(request: Request) {
           question: step.question,
           options: step.options,
           messages: step.messages ?? null,
+          interactionMode: step.interactionMode ?? "multiple_choice",
+          chatConfig:
+            step.interactionMode === "interactive_chat"
+              ? {
+                  botName:
+                    step.chatConfig?.botName?.trim() ||
+                    buildChatConfigFromMessages(step.messages).botName,
+                  maxTurns: step.chatConfig?.maxTurns ?? 6,
+                }
+              : null,
         }))
       );
     }

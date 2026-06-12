@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 type Scenario = {
   id: number;
@@ -66,6 +67,11 @@ type GeneratedStep = {
   messages: GeneratedMessage[];
   question: string;
   options: GeneratedOption[];
+  interactionMode?: "multiple_choice" | "interactive_chat";
+  chatConfig?: {
+    botName: string;
+    maxTurns?: number;
+  };
 };
 
 type GeneratedScenario = {
@@ -96,6 +102,9 @@ export function BundleManager() {
   const [aiResult, setAiResult] = useState<GeneratedScenario[] | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSavingId, setAiSavingId] = useState<number | null>(null);
+  const [aiGeneratedMode, setAiGeneratedMode] = useState<
+    "multiple_choice" | "interactive_chat" | null
+  >(null);
 
   useEffect(() => {
     async function load() {
@@ -152,7 +161,7 @@ export function BundleManager() {
     try {
       const res = await fetch("/api/bundle", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ name: newName.trim(), scenarioIds: selectedIds }),
       });
       if (res.ok) {
@@ -177,7 +186,7 @@ export function BundleManager() {
     try {
       await fetch(`/api/bundle?id=${bundle.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: bundle.name,
           active: bundle.active,
@@ -206,18 +215,22 @@ export function BundleManager() {
     );
   }
 
-  async function generateScenarios() {
+  async function generateScenarios(
+    interactionMode: "multiple_choice" | "interactive_chat"
+  ) {
     setAiGenerating(true);
     setAiError(null);
     setAiResult(null);
+    setAiGeneratedMode(interactionMode);
     try {
       const res = await fetch("/api/ai/generate-bundle", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           categories: aiCategories,
           scenarioCount: aiCount,
           topicHint: aiTopic.trim() || undefined,
+          interactionMode,
         }),
       });
       const data = await res.json();
@@ -238,7 +251,7 @@ export function BundleManager() {
     try {
       const res = await fetch("/api/ai/generate-bundle", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ scenario }),
       });
       if (res.ok) {
@@ -459,23 +472,48 @@ export function BundleManager() {
                   </div>
                 </div>
 
-                <Button
-                  onClick={generateScenarios}
-                  disabled={aiGenerating || aiCategories.length === 0}
-                  className="w-full"
-                >
-                  {aiGenerating ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
-                      Generujem...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles data-icon="inline-start" />
-                      Generovať scenáre
-                    </>
-                  )}
-                </Button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    onClick={() => generateScenarios("multiple_choice")}
+                    disabled={aiGenerating || aiCategories.length === 0}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {aiGenerating && aiGeneratedMode === "multiple_choice" ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
+                        Generujem A/B...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles data-icon="inline-start" />
+                        Generovať A/B scenáre
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => generateScenarios("interactive_chat")}
+                    disabled={aiGenerating || aiCategories.length === 0}
+                    className="w-full"
+                  >
+                    {aiGenerating && aiGeneratedMode === "interactive_chat" ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
+                        Generujem chat...
+                      </>
+                    ) : (
+                      <>
+                        <MessageCircle data-icon="inline-start" />
+                        Generovať interaktívny chat
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Interaktívny chat pripraví kroky tak, že študent píše vlastné
+                  odpovede. Referenčné A/B odpovede sa uložia skryte pre AI
+                  hodnotenie.
+                </p>
               </div>
 
               {aiError && (
@@ -503,7 +541,16 @@ export function BundleManager() {
                               · {scenario.steps.length} krokov
                             </p>
                           </div>
-                          <Badge variant="outline">{scenario.category}</Badge>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant="outline">{scenario.category}</Badge>
+                            {scenario.steps.some(
+                              (step) => step.interactionMode === "interactive_chat"
+                            ) ? (
+                              <Badge className="bg-[#EC4899] text-white">
+                                Interaktívny chat
+                              </Badge>
+                            ) : null}
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {scenario.summary}

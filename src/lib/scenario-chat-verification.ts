@@ -54,6 +54,15 @@ export function resolveMaxTurns(chatConfig?: ScenarioChatConfig | null) {
   return Math.min(Math.max(maxTurns, 1), 12);
 }
 
+export function buildChatConfigFromMessages(
+  messages?: ChatMessage[] | null
+): ScenarioChatConfig {
+  return {
+    botName: resolveBotName(messages),
+    maxTurns: DEFAULT_MAX_TURNS,
+  };
+}
+
 export function resolveBotName(
   messages: ChatMessage[] | null | undefined,
   chatConfig?: ScenarioChatConfig | null
